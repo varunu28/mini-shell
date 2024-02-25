@@ -9,7 +9,7 @@ A bare minimum implementation of a shell written in Rust
 - [X] As a user, I want to be able to type commands into the shell.
 
 ### Command Execution
-- [ ] As a user, I want to execute simple commands (e.g., `ls`, `pwd`, `echo`) and see their output.
+- [X] As a user, I want to execute simple commands (e.g., `ls`, `pwd`, `echo`) and see their output.
 - [ ] As a user, I want to execute commands with arguments (e.g., `ls -l`, `echo "Hello, world!"`).
 
 ### Built-in Commands
