@@ -4,9 +4,9 @@ A bare minimum implementation of a shell written in Rust
 ## Requirements
 
 ### Basic Shell Functionality
-- [ ] As a user, I want to run the shell application.
-- [ ] As a user, I want to see a command prompt (e.g., `$` or `>`) indicating that the shell is ready to accept commands.
-- [ ] As a user, I want to be able to type commands into the shell.
+- [X] As a user, I want to run the shell application.
+- [X] As a user, I want to see a command prompt (e.g., `$` or `>`) indicating that the shell is ready to accept commands.
+- [X] As a user, I want to be able to type commands into the shell.
 
 ### Command Execution
 - [ ] As a user, I want to execute simple commands (e.g., `ls`, `pwd`, `echo`) and see their output.
