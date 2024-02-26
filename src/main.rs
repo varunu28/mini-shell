@@ -1,5 +1,13 @@
-use std::fmt::Error;
 use std::io::{self, BufRead, Write};
+use std::os::unix::fs::PermissionsExt;
+use std::time::UNIX_EPOCH;
+
+use chrono::{DateTime, Utc};
+
+const INVALID_LIST_DIRECTORY_COMMAND: &'static str =
+    "Invalid ls command. Only `ls` and `ls -l` are supported";
+const ERROR_FORMATING_SYSTEM_TIME: &'static str =
+    "Error while formatting SystemTime to DateTime<Utc>";
 
 struct Emulator {
     writer: io::BufWriter<io::Stdout>,
@@ -33,31 +41,81 @@ impl Emulator {
         }
     }
 
-    fn process_command(&self, command: &str) -> Result<String, Error> {
+    fn process_command(&self, command: &str) -> Result<String, &'static str> {
         match command.trim() {
             "exit" => std::process::exit(0),
             "pwd" => return Ok((self.path.to_str().unwrap()).to_string() + "\n"),
-            cmd if cmd.starts_with("ls") => self.list_directory(),
+            cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
             _ => Ok(command.to_string()),
         }
     }
 
-    fn echo(&self, command: &str) -> Result<String, Error> {
+    fn echo(&self, command: &str) -> Result<String, &'static str> {
         if command.trim() == "echo" {
             return Ok("\n".to_string());
         }
         Ok(command.to_string())
     }
 
-    fn list_directory(&self) -> Result<String, Error> {
-        let mut result = String::new();
+    fn list_directory(&self, command: &str) -> Result<String, &'static str> {
+        if command.trim() != "ls" && command.trim() != "ls -l" {
+            return Err(INVALID_LIST_DIRECTORY_COMMAND);
+        }
+        let list_format = command.trim() == "ls -l";
+        let mut result: String = String::new();
+        if list_format {
+            result.push_str("Type\tMode\tSize\tModification Time\tName\n");
+        }
         for entry in std::fs::read_dir(&self.path).unwrap() {
             let entry = entry.unwrap();
-            result.push_str(&entry.file_name().to_str().unwrap());
-            result.push_str("\t");
+            if list_format {
+                let metadata = entry.metadata().unwrap();
+                let file_name = entry.file_name();
+                let file_name_str = file_name.to_string_lossy();
+                let file_type = if metadata.is_dir() {
+                    "d"
+                } else if metadata.is_file() {
+                    "f"
+                } else {
+                    "?"
+                };
+
+                let permissions = metadata.permissions();
+                let mode = permissions.mode();
+
+                // Format permissions using Unix file mode
+                let mode_string = format!("{:04o}", mode & 0o7777);
+
+                let size = metadata.len();
+
+                // Format the DateTime<Utc> to a human-readable string
+                let modification_time = metadata.modified().unwrap();
+                let datetime: DateTime<Utc> = match modification_time.duration_since(UNIX_EPOCH) {
+                    Ok(duration) => (UNIX_EPOCH + duration).into(),
+                    Err(_) => {
+                        return Err(ERROR_FORMATING_SYSTEM_TIME);
+                    }
+                };
+                let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
+                // Append the formatted string to the result
+                result.push_str(
+                    format!(
+                        "{}\t{}\t{}\t{}\t{}",
+                        file_type, mode_string, size, formatted_time, file_name_str
+                    )
+                    .as_str(),
+                );
+                result.push_str("\n");
+            } else {
+                result.push_str(&entry.file_name().to_str().unwrap());
+                result.push_str("\t");
+            }
         }
-        result.push_str("\n");
+        if !list_format {
+            result.push_str("\n");
+        }
         Ok(result)
     }
 
@@ -106,20 +164,29 @@ mod tests {
 
     #[test]
     fn test_process_command_ls() {
-        // create a temp directory and add a file
         use tempfile::tempdir;
-        let temp_dir = tempdir().unwrap();
-        // Create a file within the temporary directory
-        let file_path = temp_dir.path().join("sample.txt");
-        std::fs::File::create(&file_path).unwrap();
+        // one line for output + one line for new line
+        // `ls -l` adds an extra line for the header.
+        let test_cases = [("ls", 2), ("ls -l", 3)];
 
-        // create an emulator and set the path to the temp directory
-        let mut emulator = Emulator::new();
-        emulator.path = temp_dir.path().to_path_buf();
+        for (input, expected) in test_cases.iter() {
+            // create a temp directory and add a file
+            let temp_dir = tempdir().unwrap();
+            // Create a file within the temporary directory
+            let file_path = temp_dir.path().join("sample.txt");
+            std::fs::File::create(&file_path).unwrap();
+            // create an emulator and set the path to the temp directory
+            let mut emulator = Emulator::new();
+            emulator.path = temp_dir.path().to_path_buf();
 
-        match emulator.process_command("ls") {
-            Ok(value) => assert_eq!(value, "sample.txt\t\n"),
-            Err(_) => panic!("[test_process_command_ls] expected Ok, got error"),
+            match emulator.process_command(&input) {
+                Ok(value) => {
+                    let lines: Vec<&str> = value.split('\n').collect();
+                    assert_eq!(lines.len(), *expected);
+                }
+                Err(_) => panic!("[test_process_command_ls] expected Ok, got error"),
+            }
+            temp_dir.close().unwrap();
         }
     }
 
