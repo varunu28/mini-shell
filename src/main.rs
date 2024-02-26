@@ -48,7 +48,7 @@ impl Emulator {
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
             cmd if cmd.starts_with("cd") => self.change_directory(command),
-            _ => Ok(command.trim().to_string()),
+            _ => Err("Invalid command"),
         }
     }
 

@@ -40,7 +40,7 @@ A bare minimum implementation of a shell written in Rust
 - [ ] As a user, I want to be able to set and use environment variables within the shell.
 
 ### Error Handling
-- [ ] As a user, I want informative error messages displayed for invalid commands, syntax errors, etc.
+- [X] As a user, I want informative error messages displayed for invalid commands, syntax errors, etc.
 
 ### Scripting Support
 - [ ] As a user, I want to execute shell scripts (sequences of commands stored in a file) using the shell.
