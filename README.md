@@ -13,8 +13,8 @@ A bare minimum implementation of a shell written in Rust
 - [X] As a user, I want to execute commands with arguments (e.g., `ls -l`, `echo "Hello, world!"`).
 
 ### Built-in Commands
-- [ ] As a user, I want to implement built-in commands such as `cd`, `exit`, and `help`.
-- [ ] As a user, I want to change the current working directory using the `cd` command.
+- [X] As a user, I want to implement built-in commands such as `cd`, `exit`, and `help`.
+- [X] As a user, I want to change the current working directory using the `cd` command.
 
 ### Input/Output Redirection
 - [ ] As a user, I want to redirect the output of a command to a file using the `>` operator (e.g., `ls > output.txt`).

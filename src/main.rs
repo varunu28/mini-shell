@@ -13,7 +13,6 @@ const ERROR_FORMATING_SYSTEM_TIME: &'static str =
 struct Emulator {
     writer: io::BufWriter<io::Stdout>,
     reader: io::BufReader<io::Stdin>,
-    input_buffer: String,
     path: std::path::PathBuf,
 }
 
@@ -22,7 +21,6 @@ impl Emulator {
         Emulator {
             writer: io::BufWriter::new(io::stdout()),
             reader: io::BufReader::new(io::stdin()),
-            input_buffer: String::new(),
             path: std::env::current_dir().unwrap(),
         }
     }
@@ -32,37 +30,29 @@ impl Emulator {
     }
 
     fn read_and_process_input(&mut self) {
-        self.input_buffer.clear();
-        if let Err(err) = self.reader.read_line(&mut self.input_buffer) {
+        let mut input_buffer = String::new();
+        if let Err(err) = self.reader.read_line(&mut input_buffer) {
             panic!("Failed to read from stdin: {}", err);
         }
-        match self.process_command(&self.input_buffer) {
+
+        match self.process_command(&input_buffer) {
             Ok(result) => self.print_to_stdout(&result, true),
             Err(err) => println!("Error: {}", err),
         }
     }
 
-    fn process_command(&self, command: &str) -> Result<String, &'static str> {
+    fn process_command(&mut self, command: &str) -> Result<String, &'static str> {
         match command.trim() {
             "exit" => std::process::exit(0),
             "pwd" => return Ok((self.path.to_str().unwrap()).to_string()),
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
+            cmd if cmd.starts_with("cd") => self.change_directory(command),
             _ => Ok(command.trim().to_string()),
         }
     }
 
-    fn echo(&self, command: &str) -> Result<String, &'static str> {
-        if command.trim() == "echo" {
-            return Ok("".to_string());
-        }
-        if !command.starts_with("echo ") {
-            return Err(INVALID_ECHO_COMMAND);
-        }
-        Ok(command.trim().strip_prefix("echo ").unwrap().to_string())
-    }
-
-    fn list_directory(&self, command: &str) -> Result<String, &'static str> {
+    fn list_directory(&mut self, command: &str) -> Result<String, &'static str> {
         if command.trim() != "ls" && command.trim() != "ls -l" {
             return Err(INVALID_LIST_DIRECTORY_COMMAND);
         }
@@ -120,6 +110,29 @@ impl Emulator {
         Ok(result.trim().to_string())
     }
 
+    fn echo(&mut self, command: &str) -> Result<String, &'static str> {
+        if command.trim() == "echo" {
+            return Ok("".to_string());
+        }
+        if !command.starts_with("echo ") {
+            return Err(INVALID_ECHO_COMMAND);
+        }
+        Ok(command.trim().strip_prefix("echo ").unwrap().to_string())
+    }
+
+    fn change_directory(&mut self, command: &str) -> Result<String, &'static str> {
+        let new_directory_path = command.trim().strip_prefix("cd ").unwrap();
+        let new_path = std::path::Path::new(new_directory_path);
+        if !new_path.exists() {
+            return Err("Path does not exist");
+        }
+        if !new_path.is_dir() {
+            return Err("Path is not a directory");
+        }
+        self.path = self.path.join(new_path);
+        Ok("".to_string())
+    }
+
     fn print_to_stdout(&mut self, output: &str, new_line: bool) {
         let output = if new_line {
             format!("{}\n", output)
@@ -150,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_process_command() {
-        let emulator = Emulator::new();
+        let mut emulator = Emulator::new();
         let result = emulator.process_command("test_input");
         match result {
             Ok(value) => assert_eq!(value, "test_input"),
@@ -160,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_process_command_pwd() {
-        let emulator = Emulator::new();
+        let mut emulator = Emulator::new();
         let result = emulator.process_command("pwd");
         match result {
             Ok(value) => assert_eq!(value, (emulator.path.to_str().unwrap()).to_string()),
@@ -200,7 +213,7 @@ mod tests {
     fn test_process_command_echo() {
         let test_cases = [("echo hello", "hello"), ("echo", "")];
 
-        let emulator = Emulator::new();
+        let mut emulator = Emulator::new();
 
         for (input, expected) in test_cases.iter() {
             match emulator.process_command(&input) {
@@ -208,5 +221,20 @@ mod tests {
                 Err(_) => panic!("[test_process_command_echo] expected Ok, got error"),
             }
         }
+    }
+
+    #[test]
+    fn test_process_command_cd() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let result = emulator.process_command("cd /tmp");
+        match result {
+            Ok(_) => assert_eq!(emulator.path, std::path::PathBuf::from("/tmp")),
+            Err(_) => panic!("[test_process_command_cd] expected Ok, got error"),
+        }
+        temp_dir.close().unwrap();
     }
 }
