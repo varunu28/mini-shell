@@ -4,12 +4,6 @@ use std::time::UNIX_EPOCH;
 
 use chrono::{DateTime, Utc};
 
-const INVALID_LIST_DIRECTORY_COMMAND: &'static str =
-    "Invalid ls command. Only `ls` and `ls -l` are supported";
-const INVALID_ECHO_COMMAND: &'static str = "Invalid echo command. Correct usage: `echo <message>`";
-const ERROR_FORMATING_SYSTEM_TIME: &'static str =
-    "Error while formatting SystemTime to DateTime<Utc>";
-
 struct Emulator {
     writer: io::BufWriter<io::Stdout>,
     reader: io::BufReader<io::Stdin>,
@@ -37,24 +31,77 @@ impl Emulator {
 
         match self.process_command(&input_buffer) {
             Ok(result) => self.print_to_stdout(&result, true),
-            Err(err) => println!("Error: {}", err),
+            Err(err) => self.print_to_stdout(format!("mini-shell: {}", err).as_str(), true),
         }
     }
 
     fn process_command(&mut self, command: &str) -> Result<String, &'static str> {
         match command.trim() {
             "exit" => std::process::exit(0),
+            cmd if cmd.contains(">") => self.process_command_with_output_redirection(command),
             "pwd" => return Ok((self.path.to_str().unwrap()).to_string()),
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
             cmd if cmd.starts_with("cd") => self.change_directory(command),
-            _ => Err("Invalid command"),
+            _ => Err("mini-shell: command not found"),
         }
+    }
+
+    fn process_command_with_output_redirection(
+        &mut self,
+        command: &str,
+    ) -> Result<String, &'static str> {
+        let count = command.chars().filter(|&c| c == '>').count();
+        if count > 2 {
+            return Err("Invalid command. Correct usage `command > file` OR `command >> file`");
+        }
+        let (operation, file_name) = match count {
+            1 => {
+                let parts = command.trim().split_once('>');
+                if let Some((op, file)) = parts {
+                    (op.trim(), file.trim())
+                } else {
+                    // Handle case when '>' is missing
+                    ("", "")
+                }
+            }
+            2 => {
+                let parts = command.trim().split_once(">>");
+                if let Some((op, file)) = parts {
+                    (op.trim(), file.trim())
+                } else {
+                    ("", "")
+                }
+            }
+            _ => ("", ""),
+        };
+        if operation.is_empty() || file_name.is_empty() {
+            return Err("Invalid command. Correct usage `command > file` OR `command >> file`");
+        }
+        match self.process_command(operation) {
+            Ok(result) => {
+                let file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(count == 2)
+                    .write(true)
+                    .open(file_name);
+                match file {
+                    Ok(mut file) => {
+                        if let Err(_) = file.write_all((format!("{}\n", result)).as_bytes()) {
+                            return Err("Failed to write to file");
+                        }
+                    }
+                    Err(_) => return Err("Failed to open file"),
+                }
+            }
+            Err(err) => return Err(err),
+        };
+        Ok("".to_string())
     }
 
     fn list_directory(&mut self, command: &str) -> Result<String, &'static str> {
         if command.trim() != "ls" && command.trim() != "ls -l" {
-            return Err(INVALID_LIST_DIRECTORY_COMMAND);
+            return Err("Invalid ls command. Only `ls` and `ls -l` are supported");
         }
         let list_format = command.trim() == "ls -l";
         if list_format {
@@ -103,7 +150,7 @@ impl Emulator {
             let datetime: DateTime<Utc> = match modification_time.duration_since(UNIX_EPOCH) {
                 Ok(duration) => (UNIX_EPOCH + duration).into(),
                 Err(_) => {
-                    return Err(ERROR_FORMATING_SYSTEM_TIME);
+                    return Err("Error while formatting SystemTime to DateTime<Utc>");
                 }
             };
             let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -126,7 +173,7 @@ impl Emulator {
             return Ok("".to_string());
         }
         if !command.starts_with("echo ") {
-            return Err(INVALID_ECHO_COMMAND);
+            return Err("Invalid echo command. Correct usage: `echo <message>`");
         }
         Ok(command.trim().strip_prefix("echo ").unwrap().to_string())
     }
@@ -177,8 +224,8 @@ mod tests {
         let mut emulator = Emulator::new();
         let result = emulator.process_command("test_input");
         match result {
-            Ok(value) => assert_eq!(value, "test_input"),
-            Err(_) => panic!("[test_process_command] expected Ok, got error"),
+            Ok(_) => panic!("expected error, got Ok"),
+            Err(err) => assert_eq!(err, "mini-shell: command not found"),
         }
     }
 
