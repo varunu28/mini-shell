@@ -1,4 +1,4 @@
-# mini-shell
+# mini-shell ![example workflow](https://github.com/varunu28/mini-shell/actions/workflows/rust.yml/badge.svg)
 A bare minimum implementation of a shell written in Rust
 
 ## Requirements
