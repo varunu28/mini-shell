@@ -57,55 +57,66 @@ impl Emulator {
             return Err(INVALID_LIST_DIRECTORY_COMMAND);
         }
         let list_format = command.trim() == "ls -l";
-        let mut result: String = String::new();
         if list_format {
-            result.push_str("Type\tMode\tSize\tModification Time\tName\n");
+            return self.list_directory_with_args();
+        } else {
+            return self.list_directory_simple();
         }
+    }
+
+    fn list_directory_simple(&mut self) -> Result<String, &'static str> {
+        let mut result: String = String::new();
         for entry in std::fs::read_dir(&self.path).unwrap() {
             let entry = entry.unwrap();
-            if list_format {
-                let metadata = entry.metadata().unwrap();
-                let file_name = entry.file_name();
-                let file_name_str = file_name.to_string_lossy();
-                let file_type = if metadata.is_dir() {
-                    "d"
-                } else if metadata.is_file() {
-                    "f"
-                } else {
-                    "?"
-                };
+            result.push_str(&entry.file_name().to_str().unwrap());
+            result.push_str("\t");
+        }
+        Ok(result.trim().to_string())
+    }
 
-                let permissions = metadata.permissions();
-                let mode = permissions.mode();
-
-                // Format permissions using Unix file mode
-                let mode_string = format!("{:04o}", mode & 0o7777);
-
-                let size = metadata.len();
-
-                // Format the DateTime<Utc> to a human-readable string
-                let modification_time = metadata.modified().unwrap();
-                let datetime: DateTime<Utc> = match modification_time.duration_since(UNIX_EPOCH) {
-                    Ok(duration) => (UNIX_EPOCH + duration).into(),
-                    Err(_) => {
-                        return Err(ERROR_FORMATING_SYSTEM_TIME);
-                    }
-                };
-                let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-
-                // Append the formatted string to the result
-                result.push_str(
-                    format!(
-                        "{}\t{}\t{}\t{}\t{}",
-                        file_type, mode_string, size, formatted_time, file_name_str
-                    )
-                    .as_str(),
-                );
-                result.push_str("\n");
+    fn list_directory_with_args(&mut self) -> Result<String, &'static str> {
+        let mut result: String = String::new();
+        result.push_str("Type\tMode\tSize\tModification Time\tName\n");
+        for entry in std::fs::read_dir(&self.path).unwrap() {
+            let entry = entry.unwrap();
+            let metadata = entry.metadata().unwrap();
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_string_lossy();
+            let file_type = if metadata.is_dir() {
+                "d"
+            } else if metadata.is_file() {
+                "f"
             } else {
-                result.push_str(&entry.file_name().to_str().unwrap());
-                result.push_str("\t");
-            }
+                "?"
+            };
+
+            let permissions = metadata.permissions();
+            let mode = permissions.mode();
+
+            // Format permissions using Unix file mode
+            let mode_string = format!("{:04o}", mode & 0o7777);
+
+            let size = metadata.len();
+
+            // Format the DateTime<Utc> to a human-readable string
+            let modification_time = metadata.modified().unwrap();
+            let datetime: DateTime<Utc> = match modification_time.duration_since(UNIX_EPOCH) {
+                Ok(duration) => (UNIX_EPOCH + duration).into(),
+                Err(_) => {
+                    return Err(ERROR_FORMATING_SYSTEM_TIME);
+                }
+            };
+            let formatted_time = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
+            // Append the formatted string to the result
+            result.push_str(
+                format!(
+                    "{}\t{}\t{}\t{}\t{}",
+                    file_type, mode_string, size, formatted_time, file_name_str
+                )
+                .as_str(),
+            );
+            result.push_str("\n");
         }
         Ok(result.trim().to_string())
     }
