@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 
 const INVALID_LIST_DIRECTORY_COMMAND: &'static str =
     "Invalid ls command. Only `ls` and `ls -l` are supported";
+const INVALID_ECHO_COMMAND: &'static str = "Invalid echo command. Correct usage: `echo <message>`";
 const ERROR_FORMATING_SYSTEM_TIME: &'static str =
     "Error while formatting SystemTime to DateTime<Utc>";
 
@@ -27,7 +28,7 @@ impl Emulator {
     }
 
     fn print_prompt(&mut self) {
-        self.print_to_stdout("$ ");
+        self.print_to_stdout("$ ", false);
     }
 
     fn read_and_process_input(&mut self) {
@@ -36,7 +37,7 @@ impl Emulator {
             panic!("Failed to read from stdin: {}", err);
         }
         match self.process_command(&self.input_buffer) {
-            Ok(result) => self.print_to_stdout(&result),
+            Ok(result) => self.print_to_stdout(&result, true),
             Err(err) => println!("Error: {}", err),
         }
     }
@@ -44,18 +45,21 @@ impl Emulator {
     fn process_command(&self, command: &str) -> Result<String, &'static str> {
         match command.trim() {
             "exit" => std::process::exit(0),
-            "pwd" => return Ok((self.path.to_str().unwrap()).to_string() + "\n"),
+            "pwd" => return Ok((self.path.to_str().unwrap()).to_string()),
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
-            _ => Ok(command.to_string()),
+            _ => Ok(command.trim().to_string()),
         }
     }
 
     fn echo(&self, command: &str) -> Result<String, &'static str> {
         if command.trim() == "echo" {
-            return Ok("\n".to_string());
+            return Ok("".to_string());
         }
-        Ok(command.to_string())
+        if !command.starts_with("echo ") {
+            return Err(INVALID_ECHO_COMMAND);
+        }
+        Ok(command.trim().strip_prefix("echo ").unwrap().to_string())
     }
 
     fn list_directory(&self, command: &str) -> Result<String, &'static str> {
@@ -113,13 +117,15 @@ impl Emulator {
                 result.push_str("\t");
             }
         }
-        if !list_format {
-            result.push_str("\n");
-        }
-        Ok(result)
+        Ok(result.trim().to_string())
     }
 
-    fn print_to_stdout(&mut self, output: &str) {
+    fn print_to_stdout(&mut self, output: &str, new_line: bool) {
+        let output = if new_line {
+            format!("{}\n", output)
+        } else {
+            output.to_string()
+        };
         if let Err(err) = write!(self.writer, "{}", output) {
             panic!("Failed to write to stdout: {}", err);
         }
@@ -157,7 +163,7 @@ mod tests {
         let emulator = Emulator::new();
         let result = emulator.process_command("pwd");
         match result {
-            Ok(value) => assert_eq!(value, (emulator.path.to_str().unwrap()).to_string() + "\n"),
+            Ok(value) => assert_eq!(value, (emulator.path.to_str().unwrap()).to_string()),
             Err(_) => panic!("[test_process_command_pwd] expected Ok, got error"),
         }
     }
@@ -167,7 +173,7 @@ mod tests {
         use tempfile::tempdir;
         // one line for output + one line for new line
         // `ls -l` adds an extra line for the header.
-        let test_cases = [("ls", 2), ("ls -l", 3)];
+        let test_cases = [("ls", 1), ("ls -l", 2)];
 
         for (input, expected) in test_cases.iter() {
             // create a temp directory and add a file
@@ -192,11 +198,15 @@ mod tests {
 
     #[test]
     fn test_process_command_echo() {
+        let test_cases = [("echo hello", "hello"), ("echo", "")];
+
         let emulator = Emulator::new();
-        let result = emulator.process_command("echo");
-        match result {
-            Ok(value) => assert_eq!(value, "\n"),
-            Err(_) => panic!("[test_process_command_echo] expected Ok, got error"),
+
+        for (input, expected) in test_cases.iter() {
+            match emulator.process_command(&input) {
+                Ok(value) => assert_eq!(value, *expected),
+                Err(_) => panic!("[test_process_command_echo] expected Ok, got error"),
+            }
         }
     }
 }
