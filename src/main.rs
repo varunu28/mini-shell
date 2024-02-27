@@ -1,13 +1,17 @@
+use std::collections::VecDeque;
 use std::io::{self, BufRead, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::time::UNIX_EPOCH;
 
 use chrono::{DateTime, Utc};
 
+const HISTORY_SIZE: usize = 10;
+
 struct Emulator {
     writer: io::BufWriter<io::Stdout>,
     reader: io::BufReader<io::Stdin>,
     path: std::path::PathBuf,
+    history: VecDeque<String>,
 }
 
 impl Emulator {
@@ -16,6 +20,7 @@ impl Emulator {
             writer: io::BufWriter::new(io::stdout()),
             reader: io::BufReader::new(io::stdin()),
             path: std::env::current_dir().unwrap(),
+            history: VecDeque::with_capacity(HISTORY_SIZE),
         }
     }
 
@@ -36,10 +41,19 @@ impl Emulator {
     }
 
     fn process_command(&mut self, command: &str) -> Result<String, &'static str> {
+        self.record_history(command);
         match command.trim() {
             "exit" => std::process::exit(0),
             cmd if cmd.contains(">") => self.process_command_with_output_redirection(command),
             "pwd" => return Ok((self.path.to_str().unwrap()).to_string()),
+            "history" => {
+                return Ok(self
+                    .history
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n"))
+            }
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
             cmd if cmd.starts_with("cd") => self.change_directory(command),
@@ -204,6 +218,16 @@ impl Emulator {
             panic!("Failed to flush stdout: {}", err);
         }
     }
+
+    fn record_history(&mut self, command: &str) {
+        if command.trim().is_empty() {
+            return;
+        }
+        if self.history.len() == HISTORY_SIZE {
+            self.history.pop_front();
+        }
+        self.history.push_back(command.trim().to_string());
+    }
 }
 
 fn main() {
@@ -294,5 +318,22 @@ mod tests {
             Err(_) => panic!("[test_process_command_cd] expected Ok, got error"),
         }
         temp_dir.close().unwrap();
+    }
+
+    #[test]
+    fn test_process_command_history() {
+        let mut emulator = Emulator::new();
+        // run few commands
+        let _ignored = emulator.process_command("ls");
+        let _ignored = emulator.process_command("pwd");
+        let _ignored = emulator.process_command("echo");
+
+        let expected_result = "ls\npwd\necho\nhistory";
+
+        // verify history
+        match emulator.process_command("history") {
+            Ok(value) => assert_eq!(value, expected_result),
+            Err(_) => panic!("[test_process_command_history] expected Ok, got error"),
+        }
     }
 }

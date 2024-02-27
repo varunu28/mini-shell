@@ -17,8 +17,8 @@ A bare minimum implementation of a shell written in Rust
 - [X] As a user, I want to change the current working directory using the `cd` command.
 
 ### Input/Output Redirection
-- [ ] As a user, I want to redirect the output of a command to a file using the `>` operator (e.g., `ls > output.txt`).
-- [ ] As a user, I want to append the output of a command to a file using the `>>` operator (e.g., `echo "text" >> file.txt`).
+- [X] As a user, I want to redirect the output of a command to a file using the `>` operator (e.g., `ls > output.txt`).
+- [X] As a user, I want to append the output of a command to a file using the `>>` operator (e.g., `echo "text" >> file.txt`).
 - [ ] As a user, I want to redirect input from a file to a command using the `<` operator (e.g., `sort < input.txt`).
 
 ### Pipeline Commands
@@ -31,7 +31,7 @@ A bare minimum implementation of a shell written in Rust
 - [ ] As a user, I want the shell to handle signals like `Ctrl+C` (SIGINT) and `Ctrl+Z` (SIGTSTP) appropriately.
 
 ### Command History
-- [ ] As a user, I want to access a history of previously executed commands using the arrow keys or a `history` command.
+- [X] As a user, I want to access a history of previously executed commands using the arrow keys or a `history` command.
 
 ### Tab Completion
 - [ ] As a user, I want to have tab completion functionality for commands, file paths, and arguments.
