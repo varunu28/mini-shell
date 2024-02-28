@@ -15,6 +15,7 @@ A bare minimum implementation of a shell written in Rust
 ### Built-in Commands
 - [X] As a user, I want to implement built-in commands such as `cd`, `exit`, and `help`.
 - [X] As a user, I want to change the current working directory using the `cd` command.
+- [X] As a user, I want to sleep using the `sleep 10` command.
 
 ### Input/Output Redirection
 - [X] As a user, I want to redirect the output of a command to a file using the `>` operator (e.g., `ls > output.txt`).

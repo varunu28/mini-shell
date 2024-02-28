@@ -45,18 +45,12 @@ impl Emulator {
         match command.trim() {
             "exit" => std::process::exit(0),
             cmd if cmd.contains(">") => self.process_command_with_output_redirection(command),
-            "pwd" => return Ok((self.path.to_str().unwrap()).to_string()),
-            "history" => {
-                return Ok(self
-                    .history
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n"))
-            }
+            "pwd" => Ok((self.path.to_str().unwrap()).to_string()),
+            "history" => self.history(),
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
             cmd if cmd.starts_with("cd") => self.change_directory(command),
+            cmd if cmd.starts_with("sleep") => self.sleep(command),
             _ => Err("mini-shell: command not found"),
         }
     }
@@ -227,6 +221,27 @@ impl Emulator {
             self.history.pop_front();
         }
         self.history.push_back(command.trim().to_string());
+    }
+
+    fn history(&mut self) -> Result<String, &'static str> {
+        Ok(self
+            .history
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join("\n"))
+    }
+
+    fn sleep(&mut self, command: &str) -> Result<String, &'static str> {
+        if command.trim() == "sleep" {
+            return Err("correct usage: `sleep <duration>`");
+        }
+        let duration = command.trim().strip_prefix("sleep ").unwrap();
+        match duration.parse::<u64>() {
+            Ok(value) => std::thread::sleep(std::time::Duration::from_secs(value)),
+            Err(_) => return Err("sleep duration should be a positive integer"),
+        }
+        Ok("".to_string())
     }
 }
 
