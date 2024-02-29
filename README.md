@@ -26,7 +26,7 @@ A bare minimum implementation of a shell written in Rust
 - [ ] As a user, I want to support command pipelines using the `|` operator (e.g., `ls | grep .txt`).
 
 ### Background Processes
-- [ ] As a user, I want to run commands in the background by appending `&` to the command (e.g., `sleep 10 &`).
+- [X] As a user, I want to run commands in the background by appending `&` to the command (e.g., `sleep 10 &`).
 
 ### Signal Handling
 - [ ] As a user, I want the shell to handle signals like `Ctrl+C` (SIGINT) and `Ctrl+Z` (SIGTSTP) appropriately.

@@ -24,6 +24,15 @@ impl Emulator {
         }
     }
 
+    fn clone(&self) -> Self {
+        Emulator {
+            writer: io::BufWriter::new(io::stdout()),
+            reader: io::BufReader::new(io::stdin()),
+            path: self.path.clone(),
+            history: self.history.clone(),
+        }
+    }
+
     fn print_prompt(&mut self) {
         self.print_to_stdout("$ ", false);
     }
@@ -32,6 +41,20 @@ impl Emulator {
         let mut input_buffer = String::new();
         if let Err(err) = self.reader.read_line(&mut input_buffer) {
             panic!("Failed to read from stdin: {}", err);
+        }
+
+        // TODO: Fix formatting of new line
+        if input_buffer.trim().ends_with(" &") {
+            let input_buffer = input_buffer.clone();
+            let input_buffer_trimmed = input_buffer.trim().trim_end_matches(" &").to_string(); // Remove the trailing `&`
+            let mut emulator = self.clone(); // Clone the emulator to be used in the spawned thread
+            std::thread::spawn(move || {
+                match emulator.process_command(&input_buffer_trimmed) {
+                    Ok(result) => emulator.print_to_stdout(&result, true),
+                    Err(err) => emulator.print_to_stdout(format!("mini-shell: {}", err).as_str(), true),
+                }
+            });
+            return;
         }
 
         match self.process_command(&input_buffer) {
