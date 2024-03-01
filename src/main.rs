@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::time::UNIX_EPOCH;
 
@@ -48,12 +48,14 @@ impl Emulator {
             let input_buffer = input_buffer.clone();
             let input_buffer_trimmed = input_buffer.trim().trim_end_matches(" &").to_string(); // Remove the trailing `&`
             let mut emulator = self.clone(); // Clone the emulator to be used in the spawned thread
-            std::thread::spawn(move || {
-                match emulator.process_command(&input_buffer_trimmed) {
+            std::thread::spawn(
+                move || match emulator.process_command(&input_buffer_trimmed) {
                     Ok(result) => emulator.print_to_stdout(&result, true),
-                    Err(err) => emulator.print_to_stdout(format!("mini-shell: {}", err).as_str(), true),
-                }
-            });
+                    Err(err) => {
+                        emulator.print_to_stdout(format!("mini-shell: {}", err).as_str(), true)
+                    }
+                },
+            );
             return;
         }
 
@@ -68,6 +70,7 @@ impl Emulator {
         match command.trim() {
             "exit" => std::process::exit(0),
             cmd if cmd.contains(">") => self.process_command_with_output_redirection(command),
+            cmd if cmd.contains("<") => self.process_command_with_input_redirection(command),
             "pwd" => Ok((self.path.to_str().unwrap()).to_string()),
             "history" => self.history(),
             cmd if cmd.starts_with("ls") => self.list_directory(command),
@@ -76,6 +79,43 @@ impl Emulator {
             cmd if cmd.starts_with("sleep") => self.sleep(command),
             _ => Err("mini-shell: command not found"),
         }
+    }
+
+    fn process_command_with_input_redirection(
+        &mut self,
+        command: &str,
+    ) -> Result<String, &'static str> {
+        let count = command.chars().filter(|&c| c == '<').count();
+        if count != 1 {
+            return Err("Invalid command. Correct usage `command < file`");
+        }
+        let (operation, file_name) = match command.trim().split_once('<') {
+            Some((op, file)) => (op.trim(), file.trim()),
+            None => ("", ""),
+        };
+        if operation.trim().is_empty() || file_name.trim().is_empty() {
+            return Err("Invalid command. Correct usage `command < file`");
+        }
+        let file = std::fs::OpenOptions::new().read(true).open(file_name);
+        match file {
+            Ok(mut file) => {
+                let mut buffer = String::new();
+                if let Err(_) = file.read_to_string(&mut buffer) {
+                    return Err("Failed to read from file");
+                }
+                match operation.trim() {
+                    "sort" => self.process_sort_command(buffer.as_str()),
+                    _ => Err("mini-shell: command not found"),
+                }
+            }
+            Err(_) => return Err("Failed to open file"),
+        }
+    }
+
+    fn process_sort_command(&mut self, buffer: &str) -> Result<String, &'static str> {
+        let mut lines: Vec<&str> = buffer.split('\n').collect();
+        lines.sort();
+        Ok(lines.join("\n"))
     }
 
     fn process_command_with_output_redirection(

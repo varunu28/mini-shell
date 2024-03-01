@@ -20,7 +20,8 @@ A bare minimum implementation of a shell written in Rust
 ### Input/Output Redirection
 - [X] As a user, I want to redirect the output of a command to a file using the `>` operator (e.g., `ls > output.txt`).
 - [X] As a user, I want to append the output of a command to a file using the `>>` operator (e.g., `echo "text" >> file.txt`).
-- [ ] As a user, I want to redirect input from a file to a command using the `<` operator (e.g., `sort < input.txt`).
+- [X] As a user, I want to redirect input from a file to a command using the `<` operator (e.g., `sort < input.txt`).
+- [ ] As a user, I want to concatenate file & display its contents using `cat` operator (e.g., `cat file.txt`).
 
 ### Pipeline Commands
 - [ ] As a user, I want to support command pipelines using the `|` operator (e.g., `ls | grep .txt`).
