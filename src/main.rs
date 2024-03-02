@@ -69,14 +69,15 @@ impl Emulator {
         self.record_history(command);
         match command.trim() {
             "exit" => std::process::exit(0),
+            "history" => self.history(),
+            "pwd" => Ok((self.path.to_str().unwrap()).to_string()),
             cmd if cmd.contains(">") => self.process_command_with_output_redirection(command),
             cmd if cmd.contains("<") => self.process_command_with_input_redirection(command),
-            "pwd" => Ok((self.path.to_str().unwrap()).to_string()),
-            "history" => self.history(),
             cmd if cmd.starts_with("ls") => self.list_directory(command),
             cmd if cmd.starts_with("echo") => self.echo(command),
             cmd if cmd.starts_with("cd") => self.change_directory(command),
             cmd if cmd.starts_with("sleep") => self.sleep(command),
+            cmd if cmd.starts_with("cat") => self.cat(command),
             _ => Err("mini-shell: command not found"),
         }
     }
@@ -306,6 +307,25 @@ impl Emulator {
         }
         Ok("".to_string())
     }
+
+    fn cat(&mut self, command: &str) -> Result<String, &'static str> {
+        if command.trim() == "cat" {
+            return Err("correct usage: `cat <file>`");
+        }
+        let file_name = command.trim().strip_prefix("cat ").unwrap();
+        let file_path = self.path.join(file_name);
+        let file = std::fs::OpenOptions::new().read(true).open(file_path);
+        match file {
+            Ok(mut file) => {
+                let mut buffer = String::new();
+                if let Err(_) = file.read_to_string(&mut buffer) {
+                    return Err("Failed to read from file");
+                }
+                Ok(buffer)
+            }
+            Err(_) => return Err("Failed to open file"),
+        }
+    }
 }
 
 fn main() {
@@ -413,5 +433,33 @@ mod tests {
             Ok(value) => assert_eq!(value, expected_result),
             Err(_) => panic!("[test_process_command_history] expected Ok, got error"),
         }
+    }
+
+    #[test]
+    fn test_process_command_cat() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let file_path = temp_dir.path().join("sample.txt");
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&file_path);
+        match file {
+            Ok(mut file) => {
+                if let Err(_) = file.write_all("hello".as_bytes()) {
+                    panic!("Failed to write to file");
+                }
+            }
+            Err(_) => panic!("Failed to open file"),
+        }
+
+        match emulator.process_command("cat sample.txt") {
+            Ok(value) => assert_eq!(value, "hello"),
+            Err(_) => panic!("[test_process_command_cat] expected Ok, got error"),
+        }
+        temp_dir.close().unwrap();
     }
 }
