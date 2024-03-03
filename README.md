@@ -34,7 +34,7 @@ A bare minimum implementation of a shell written in Rust
 - [X] As a user, I want to run commands in the background by appending `&` to the command (e.g., `sleep 10 &`).
 
 ### Signal Handling
-- [ ] As a user, I want the shell to handle signals like `Ctrl+C` (SIGINT) and `Ctrl+Z` (SIGTSTP) appropriately.
+- [X] As a user, I want the shell to handle signals like `Ctrl+C` (SIGINT) and `Ctrl+Z` (SIGTSTP) appropriately.
 
 ### Command History
 - [X] As a user, I want to access a history of previously executed commands using the arrow keys or a `history` command.

@@ -40,8 +40,10 @@ impl Emulator {
 
     pub fn read_and_process_input(&mut self) {
         let mut input_buffer = String::new();
-        if let Err(err) = self.reader.read_line(&mut input_buffer) {
-            panic!("Failed to read from stdin: {}", err);
+        match self.reader.read_line(&mut input_buffer) {
+            Ok(0) => std::process::exit(0),
+            Ok(_) => {}
+            Err(_) => panic!("Failed to read from stdin"),
         }
 
         // TODO: Fix formatting of new line
