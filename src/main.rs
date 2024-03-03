@@ -81,6 +81,8 @@ impl Emulator {
             cmd if cmd.starts_with("cat") => self.cat(command),
             cmd if cmd.starts_with("rmdir") => self.rm(command, true),
             cmd if cmd.starts_with("rm") => self.rm(command, false),
+            cmd if cmd.starts_with("touch ") => self.create_new_file(command),
+            cmd if cmd.starts_with("mkdir") => self.create_new_directory(command),
             _ => Err("mini-shell: command not found"),
         }
     }
@@ -354,6 +356,44 @@ impl Emulator {
         }
         Ok("".to_string())
     }
+
+    fn create_new_file(&mut self, command: &str) -> Result<String, &'static str> {
+        if command.trim() == "touch" {
+            return Err("correct usage: `touch <file>`");
+        }
+        let file_name = command.trim().strip_prefix("touch ").unwrap();
+        if file_name.is_empty() {
+            return Err("Invalid file name. correct usage: `touch <file>`");
+        }
+        let file_path = self.path.join(file_name);
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(file_path);
+        match file {
+            Ok(_) => Ok("".to_string()),
+            Err(_) => return Err("Failed to create file"),
+        }
+    }
+
+    fn create_new_directory(&mut self, command: &str) -> Result<String, &'static str> {
+        if command.trim() == "mkdir" {
+            return Err("correct usage: `mkdir <directory>`");
+        }
+        let dir_name = command.trim().strip_prefix("mkdir ").unwrap();
+        if dir_name.is_empty() {
+            return Err("Invalid directory name. correct usage: `mkdir <directory>`");
+        }
+        let dir_path = self.path.join(dir_name);
+        let file = File::open(&dir_path);
+        if file.is_ok() {
+            return Err("Directory already exists");
+        }
+        match std::fs::create_dir(dir_path) {
+            Ok(_) => Ok("".to_string()),
+            Err(_) => return Err("Failed to create directory"),
+        }
+    }
 }
 
 fn main() {
@@ -511,7 +551,7 @@ mod tests {
             Err(_) => panic!("[test_process_command_rm_file] expected Ok, got error"),
         }
 
-        match emulator.process_command("pwd") {
+        match emulator.process_command("ls") {
             Ok(value) => assert!(!value.contains(file_name)),
             Err(_) => panic!("[test_process_command_rm_file] expected Ok, got error"),
         }
@@ -533,9 +573,47 @@ mod tests {
             Err(_) => panic!("[test_process_command_rmdir] expected Ok, got error"),
         }
 
-        match emulator.process_command("pwd") {
+        match emulator.process_command("ls") {
             Ok(value) => assert!(!value.contains(dir_name)),
             Err(_) => panic!("[test_process_command_rmdir] expected Ok, got error"),
+        }
+    }
+
+    #[test]
+    fn test_process_command_touch() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let file_name = "sample.txt";
+        match emulator.process_command(format!("touch {}", file_name).as_str()) {
+            Ok(value) => assert_eq!(value, ""),
+            Err(_) => panic!("[test_process_command_touch] expected Ok, got error"),
+        }
+
+        match emulator.process_command("ls") {
+            Ok(value) => assert!(value.contains(file_name)),
+            Err(_) => panic!("[test_process_command_touch] expected Ok, got error"),
+        }
+    }
+
+    #[test]
+    fn test_process_command_mkdir() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let dir_name = "sample_dir";
+        match emulator.process_command(format!("mkdir {}", dir_name).as_str()) {
+            Ok(value) => assert_eq!(value, ""),
+            Err(_) => panic!("[test_process_command_mkdir] expected Ok, got error"),
+        }
+
+        match emulator.process_command("ls") {
+            Ok(value) => assert!(value.contains(dir_name)),
+            Err(_) => panic!("[test_process_command_mkdir] expected Ok, got error"),
         }
     }
 }

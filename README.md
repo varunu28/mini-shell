@@ -22,8 +22,8 @@ A bare minimum implementation of a shell written in Rust
 - [X] As a user, I want to append the output of a command to a file using the `>>` operator (e.g., `echo "text" >> file.txt`).
 - [X] As a user, I want to redirect input from a file to a command using the `<` operator (e.g., `sort < input.txt`).
 - [X] As a user, I want to concatenate file & display its contents using `cat` operator (e.g., `cat file.txt`).
-- [ ] As a user, I want to create file using `touch` operator (e.g., `touch file.txt`).
-- [ ] As a user, I want to create directory using `mkdir` operator (e.g., `mkdir dir`).
+- [X] As a user, I want to create file using `touch` operator (e.g., `touch file.txt`).
+- [X] As a user, I want to create directory using `mkdir` operator (e.g., `mkdir dir`).
 - [X] As a user, I want to remove file using `rm` operator (e.g., `rm file.txt`).
 - [X] As a user, I want to remove directory using `rmdir` operator (e.g., `rmdir dir`).
 
