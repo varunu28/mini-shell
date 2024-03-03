@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fs::File;
 use std::io::{self, BufRead, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::time::UNIX_EPOCH;
@@ -78,6 +79,8 @@ impl Emulator {
             cmd if cmd.starts_with("cd") => self.change_directory(command),
             cmd if cmd.starts_with("sleep") => self.sleep(command),
             cmd if cmd.starts_with("cat") => self.cat(command),
+            cmd if cmd.starts_with("rmdir") => self.rm(command, true),
+            cmd if cmd.starts_with("rm") => self.rm(command, false),
             _ => Err("mini-shell: command not found"),
         }
     }
@@ -326,6 +329,31 @@ impl Emulator {
             Err(_) => return Err("Failed to open file"),
         }
     }
+
+    fn rm(&mut self, command: &str, is_directory: bool) -> Result<String, &'static str> {
+        if command.trim() == "rm" || command.trim() == "rmdir" {
+            return Err("correct usage: `rm <file> OR rmdir <directory>`");
+        }
+        let prefix = if is_directory { "rmdir " } else { "rm " };
+        let file_name = command.trim().strip_prefix(prefix).unwrap();
+        let file_path = self.path.join(file_name);
+        let file = File::open(file_path);
+        match file {
+            Ok(_) => {
+                if file.unwrap().metadata().unwrap().is_dir() && !is_directory {
+                    return Err("rm: cannot remove directory. Use `rmdir` instead");
+                }
+                let file_path = self.path.join(file_name);
+                if is_directory {
+                    std::fs::remove_dir(file_path).unwrap();
+                } else {
+                    std::fs::remove_file(file_path).unwrap();
+                }
+            }
+            Err(_) => return Err("Failed to open file"),
+        }
+        Ok("".to_string())
+    }
 }
 
 fn main() {
@@ -461,5 +489,53 @@ mod tests {
             Err(_) => panic!("[test_process_command_cat] expected Ok, got error"),
         }
         temp_dir.close().unwrap();
+    }
+
+    #[test]
+    fn test_process_command_rm_file() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let file_name = "sample.txt";
+        let file_path = temp_dir.path().join(file_name);
+        std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&file_path)
+            .unwrap();
+
+        match emulator.process_command(format!("rm {}", file_name).as_str()) {
+            Ok(value) => assert_eq!(value, ""),
+            Err(_) => panic!("[test_process_command_rm_file] expected Ok, got error"),
+        }
+
+        match emulator.process_command("pwd") {
+            Ok(value) => assert!(!value.contains(file_name)),
+            Err(_) => panic!("[test_process_command_rm_file] expected Ok, got error"),
+        }
+    }
+
+    #[test]
+    fn test_process_command_rmdir() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let dir_name = "sample_dir";
+        let dir_path = temp_dir.path().join(dir_name);
+        std::fs::create_dir(&dir_path).unwrap();
+
+        match emulator.process_command(format!("rmdir {}", dir_name).as_str()) {
+            Ok(value) => assert_eq!(value, ""),
+            Err(_) => panic!("[test_process_command_rmdir] expected Ok, got error"),
+        }
+
+        match emulator.process_command("pwd") {
+            Ok(value) => assert!(!value.contains(dir_name)),
+            Err(_) => panic!("[test_process_command_rmdir] expected Ok, got error"),
+        }
     }
 }
