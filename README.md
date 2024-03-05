@@ -26,6 +26,7 @@ A bare minimum implementation of a shell written in Rust
 - [X] As a user, I want to create directory using `mkdir` operator (e.g., `mkdir dir`).
 - [X] As a user, I want to remove file using `rm` operator (e.g., `rm file.txt`).
 - [X] As a user, I want to remove directory using `rmdir` operator (e.g., `rmdir dir`).
+- [X] As a user, I want to search in a file using `grep` operator (e.g., `grep "pattern" file.txt`)
 
 ### Pipeline Commands
 - [ ] As a user, I want to support command pipelines using the `|` operator (e.g., `ls | grep .txt`).

@@ -85,6 +85,7 @@ impl Emulator {
             cmd if cmd.starts_with("rm") => self.rm(command, false),
             cmd if cmd.starts_with("touch ") => self.create_new_file(command),
             cmd if cmd.starts_with("mkdir") => self.create_new_directory(command),
+            cmd if cmd.starts_with("grep") => self.process_grep_command(command),
             _ => Err("mini-shell: command not found"),
         }
     }
@@ -396,6 +397,37 @@ impl Emulator {
             Err(_) => return Err("Failed to create directory"),
         }
     }
+
+    fn process_grep_command(&mut self, command: &str) -> Result<String, &'static str> {
+        let parts: Vec<&str> = command.trim().split(' ').collect();
+        if parts.len() != 3 {
+            return Err("Invalid grep command. Correct usage: `grep <pattern> <file>`");
+        }
+        let pattern = parts[1];
+        let file_name = parts[2];
+        let file_path = self.path.join(file_name);
+        let file = std::fs::OpenOptions::new().read(true).open(file_path);
+        match file {
+            Ok(mut file) => {
+                let mut buffer = String::new();
+                if let Err(_) = file.read_to_string(&mut buffer) {
+                    return Err("Failed to read from file");
+                }
+                let result = self.find_pattern_in_file(pattern, buffer.as_str());
+                Ok(result.join("\n"))
+            }
+            Err(_) => return Err("Failed to open file"),
+        }
+    }
+
+    fn find_pattern_in_file(&mut self, pattern: &str, file: &str) -> Vec<String> {
+        let lines: Vec<&str> = file.split('\n').collect();
+        lines
+            .iter()
+            .filter(|line| line.contains(pattern))
+            .map(|line| line.to_string())
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -608,5 +640,34 @@ mod tests {
             Ok(value) => assert!(value.contains(dir_name)),
             Err(_) => panic!("[test_process_command_mkdir] expected Ok, got error"),
         }
+    }
+
+    #[test]
+    fn test_process_grep_command() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let mut emulator = Emulator::new();
+        emulator.path = temp_dir.path().to_path_buf();
+
+        let file_name = "sample.txt";
+        let file_path = temp_dir.path().join(file_name);
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&file_path);
+        match file {
+            Ok(mut file) => {
+                if let Err(_) = file.write_all("hello\nworld\nhello".as_bytes()) {
+                    panic!("Failed to write to file");
+                }
+            }
+            Err(_) => panic!("Failed to open file"),
+        }
+
+        match emulator.process_grep_command(format!("grep hello {}", file_name).as_str()) {
+            Ok(value) => assert_eq!(value, "hello\nhello"),
+            Err(_) => panic!("[test_process_grep_command] expected Ok, got error"),
+        }
+        temp_dir.close().unwrap();
     }
 }
